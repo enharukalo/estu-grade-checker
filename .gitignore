@@ -20,3 +20,16 @@
 # Go workspace file
 go.work
 go.work.sum
+
+# Environment variables
+.env
+
+# Database
+users.db
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
