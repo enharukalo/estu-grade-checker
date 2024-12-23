@@ -56,7 +56,7 @@ func main() {
 
 	updates := bot.GetUpdatesChan(u)
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(10 * time.Minute)
 	go func() {
 		for range ticker.C {
 			CheckForUpdates(bot, db)
