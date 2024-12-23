@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -39,62 +40,62 @@ type GradeResponse struct {
 	} `json:"ogrenciBirimList"`
 }
 
-func CheckForUpdates(bot *tgbotapi.BotAPI) {
-    rows, err := db.Query("SELECT id, telegram_id, cookie, donemid, grades, alarm FROM users WHERE alarm = 1")
-    if err != nil {
-        log.Println("Failed to query users:", err)
-        return
-    }
-    defer rows.Close()
+func CheckForUpdates(bot *tgbotapi.BotAPI, db *sql.DB) {
+	rows, err := db.Query("SELECT id, telegram_id, cookie, donemid, grades, alarm FROM users WHERE alarm = 1")
+	if err != nil {
+		log.Println("Failed to query users:", err)
+		return
+	}
+	defer rows.Close()
 
-    for rows.Next() {
-        var user User
-        if err := rows.Scan(&user.ID, &user.TelegramID, &user.Cookie, &user.DonemID, &user.Grades, &user.Alarm); err != nil {
-            log.Println("Failed to scan user:", err)
-            continue
-        }
+	for rows.Next() {
+		var user User
+		if err := rows.Scan(&user.ID, &user.TelegramID, &user.Cookie, &user.DonemID, &user.Grades, &user.Alarm); err != nil {
+			log.Println("Failed to scan user:", err)
+			continue
+		}
 
-        newGrades, err := fetchGrades(user.Cookie, user.DonemID)
-        if err != nil {
-            log.Printf("Failed to fetch grades for user %d: %v\n", user.TelegramID, err)
+		newGrades, err := fetchGrades(user.Cookie, user.DonemID)
+		if err != nil {
+			log.Printf("Failed to fetch grades for user %d: %v\n", user.TelegramID, err)
 			msg := tgbotapi.NewMessage(user.TelegramID, "Failed to fetch grades. Please check your cookie and donemid. You can disable alarms using /alarm false.")
 			bot.Send(msg)
-            continue
-        }
+			continue
+		}
 
-        var oldGrades map[string]map[string]string
-        if user.Grades != "" {
-            json.Unmarshal([]byte(user.Grades), &oldGrades)
-        }
+		var oldGrades map[string]map[string]string
+		if user.Grades != "" {
+			json.Unmarshal([]byte(user.Grades), &oldGrades)
+		}
 
-        updates := checkGradeUpdates(oldGrades, newGrades, user.Alarm)
-        if len(updates) > 0 {
-            tx, err := db.Begin()
-            if err != nil {
-                log.Printf("Failed to begin transaction for user %d: %v\n", user.TelegramID, err)
-                continue
-            }
+		updates := checkGradeUpdates(oldGrades, newGrades, user.Alarm)
+		if len(updates) > 0 {
+			tx, err := db.Begin()
+			if err != nil {
+				log.Printf("Failed to begin transaction for user %d: %v\n", user.TelegramID, err)
+				continue
+			}
 
-            updatedGrades, _ := json.Marshal(newGrades)
-            _, err = tx.Exec("UPDATE users SET grades = ? WHERE id = ?", string(updatedGrades), user.ID)
-            if err != nil {
-                tx.Rollback()
-                log.Printf("Failed to update grades for user %d: %v\n", user.TelegramID, err)
-                continue
-            }
+			updatedGrades, _ := json.Marshal(newGrades)
+			_, err = tx.Exec("UPDATE users SET grades = ? WHERE id = ?", string(updatedGrades), user.ID)
+			if err != nil {
+				tx.Rollback()
+				log.Printf("Failed to update grades for user %d: %v\n", user.TelegramID, err)
+				continue
+			}
 
-            err = tx.Commit()
-            if err != nil {
-                log.Printf("Failed to commit transaction for user %d: %v\n", user.TelegramID, err)
-                continue
-            }
+			err = tx.Commit()
+			if err != nil {
+				log.Printf("Failed to commit transaction for user %d: %v\n", user.TelegramID, err)
+				continue
+			}
 
-            for _, update := range updates {
-                msg := tgbotapi.NewMessage(user.TelegramID, update)
-                bot.Send(msg)
-            }
-        }
-    }
+			for _, update := range updates {
+				msg := tgbotapi.NewMessage(user.TelegramID, update)
+				bot.Send(msg)
+			}
+		}
+	}
 }
 
 func fetchGrades(cookie string, donemID string) (map[string]map[string]string, error) {

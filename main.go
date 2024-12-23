@@ -14,13 +14,13 @@ import (
 var db *sql.DB
 
 func InitDB(filepath string) {
-    var err error
-    db, err = sql.Open("sqlite3", filepath)
-    if err != nil {
-        log.Fatal(err)
-    }
+	var err error
+	db, err = sql.Open("sqlite3", filepath)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    createTableSQL := `
+	createTableSQL := `
     CREATE TABLE IF NOT EXISTS users (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
         "telegram_id" INTEGER NOT NULL UNIQUE,
@@ -30,10 +30,10 @@ func InitDB(filepath string) {
         "grades" TEXT
     );`
 
-    _, err = db.Exec(createTableSQL)
-    if err != nil {
-        log.Fatal(err)
-    }
+	_, err = db.Exec(createTableSQL)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func main() {
@@ -47,8 +47,8 @@ func main() {
 		log.Panic(err)
 	}
 
-    InitDB("users.db")
-    defer db.Close()
+	InitDB("users.db")
+	defer db.Close()
 	bot.Debug = true
 
 	u := tgbotapi.NewUpdate(0)
@@ -56,10 +56,10 @@ func main() {
 
 	updates := bot.GetUpdatesChan(u)
 
-	ticker := time.NewTicker(10 * time.Minute)
+	ticker := time.NewTicker(10 * time.Second)
 	go func() {
 		for range ticker.C {
-			CheckForUpdates(bot)
+			CheckForUpdates(bot, db)
 		}
 	}()
 
