@@ -56,6 +56,11 @@ func main() {
 
 	updates := bot.GetUpdatesChan(u)
 
+	// Check for updates immediately at startup
+	log.Println("Checking for updates at startup...")
+	CheckForUpdates(bot, db)
+
+	// Then set up periodic checks
 	ticker := time.NewTicker(10 * time.Minute)
 	go func() {
 		for range ticker.C {
