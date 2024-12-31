@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -65,34 +66,34 @@ func CheckForUpdates(bot *tgbotapi.BotAPI, db *sql.DB) {
 
 		var oldGrades map[string]map[string]string
 		if user.Grades != "" {
-			json.Unmarshal([]byte(user.Grades), &oldGrades)
+			if err := json.Unmarshal([]byte(user.Grades), &oldGrades); err != nil {
+				log.Printf("Failed to unmarshal old grades for user %d: %v\n", user.TelegramID, err)
+				continue
+			}
 		}
 
+		// Check for updates before updating the database
 		updates := checkGradeUpdates(oldGrades, newGrades, user.Alarm)
+
+		// Update database first
+		updatedGrades, err := json.Marshal(newGrades)
+		if err != nil {
+			log.Printf("Failed to marshal new grades for user %d: %v\n", user.TelegramID, err)
+			continue
+		}
+
+		if err := UpdateGrades(db, user.ID, string(updatedGrades)); err != nil {
+			log.Printf("Failed to update grades in database for user %d: %v\n", user.TelegramID, err)
+			continue
+		}
+
+		// Send notifications after successful database update
 		if len(updates) > 0 {
-			tx, err := db.Begin()
-			if err != nil {
-				log.Printf("Failed to begin transaction for user %d: %v\n", user.TelegramID, err)
-				continue
-			}
-
-			updatedGrades, _ := json.Marshal(newGrades)
-			_, err = tx.Exec("UPDATE users SET grades = ? WHERE id = ?", string(updatedGrades), user.ID)
-			if err != nil {
-				tx.Rollback()
-				log.Printf("Failed to update grades for user %d: %v\n", user.TelegramID, err)
-				continue
-			}
-
-			err = tx.Commit()
-			if err != nil {
-				log.Printf("Failed to commit transaction for user %d: %v\n", user.TelegramID, err)
-				continue
-			}
-
 			for _, update := range updates {
 				msg := tgbotapi.NewMessage(user.TelegramID, update)
-				bot.Send(msg)
+				if _, err := bot.Send(msg); err != nil {
+					log.Printf("Failed to send update message to user %d: %v\n", user.TelegramID, err)
+				}
 			}
 		}
 	}
@@ -101,7 +102,11 @@ func CheckForUpdates(bot *tgbotapi.BotAPI, db *sql.DB) {
 func fetchGrades(cookie string, donemID string) (map[string]map[string]string, error) {
 	url := "https://obs.eskisehir.edu.tr/ogrenci/not-gor?donemId=" + donemID
 
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
 	req.Header.Set("Cookie", cookie)
 	req.Header.Set("Host", "obs.eskisehir.edu.tr")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Linux x86_64; en-US) Gecko/20100101 Firefox/54.9")
@@ -113,8 +118,19 @@ func fetchGrades(cookie string, donemID string) (map[string]map[string]string, e
 	req.Header.Set("Sec-Fetch-Dest", "empty")
 	req.Header.Set("Sec-Fetch-Mode", "cors")
 	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	client := &http.Client{}
-	resp, err := client.Do(req)
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	var resp *http.Response
+	for retries := 3; retries > 0; retries-- {
+		resp, err = client.Do(req)
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
 	if err != nil {
 		log.Printf("HTTP request failed: %v", err)
 		return nil, err
