@@ -31,9 +31,6 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/main .
 
-# Copy .env file
-COPY .env .
-
 # Create volume for database
 VOLUME /app/data
 
