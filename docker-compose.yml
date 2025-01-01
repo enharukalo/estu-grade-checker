@@ -1,0 +1,15 @@
+services:
+  estu-grade-checker:
+    build: .
+    container_name: estu-grade-checker
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - TZ=Europe/Istanbul
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 

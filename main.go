@@ -47,7 +47,7 @@ func main() {
 		log.Panic(err)
 	}
 
-	InitDB("users.db")
+	InitDB("/app/data/users.db")
 	defer db.Close()
 	bot.Debug = true
 

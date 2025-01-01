@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+estu-grade-checker
 
 # Test binary, built with `go test -c`
 *.test
@@ -26,6 +27,8 @@ go.work.sum
 
 # Database
 users.db
+users.db*
+data/
 
 # IDE-specific files
 .vscode/
@@ -33,3 +36,7 @@ users.db
 
 # macOS
 .DS_Store
+
+# Docker
+*.env
+.docker/
