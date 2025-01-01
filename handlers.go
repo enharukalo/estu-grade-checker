@@ -107,7 +107,6 @@ func handleGet(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
 
 	args := strings.TrimSpace(strings.TrimPrefix(message.Text, "/get"))
 	if args == "" {
-		// Fetch and display "Grade" gradetype for all courses
 		grades, err := fetchGrades(user.Cookie, user.DonemID)
 		if err != nil {
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Failed to fetch grades.")
@@ -120,6 +119,8 @@ func handleGet(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
 			json.Unmarshal([]byte(user.Grades), &oldGrades)
 		}
 
+		updates := checkGradeUpdates(oldGrades, grades, user.Alarm)
+
 		userGrades := strings.Builder{}
 		for course, gradeDetails := range grades {
 			if grade, exists := gradeDetails["Grade"]; exists {
@@ -129,20 +130,21 @@ func handleGet(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
 			}
 		}
 
-		updates := checkGradeUpdates(oldGrades, grades, user.Alarm)
-		if user.Grades != "" && len(updates) > 0 && user.Alarm {
+		updatedGrades, _ := json.Marshal(grades)
+		updatedGradesStr := string(updatedGrades)
+		if err := UpdateGrades(db, user.ID, updatedGradesStr); err != nil {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Failed to update grades in the database.")
+			bot.Send(msg)
+			return
+		}
+
+		user.Grades = updatedGradesStr
+
+		if len(updates) > 0 && user.Alarm {
 			for _, update := range updates {
 				msg := tgbotapi.NewMessage(user.TelegramID, update)
 				bot.Send(msg)
 			}
-		}
-
-		updatedGrades, _ := json.Marshal(grades)
-		err = UpdateGrades(db, user.ID, string(updatedGrades))
-		if err != nil {
-			msg := tgbotapi.NewMessage(message.Chat.ID, "Failed to update grades in the database.")
-			bot.Send(msg)
-			return
 		}
 
 		msg := tgbotapi.NewMessage(message.Chat.ID, userGrades.String())

@@ -42,6 +42,7 @@ type GradeResponse struct {
 }
 
 func CheckForUpdates(bot *tgbotapi.BotAPI, db *sql.DB) {
+	log.Println("Starting periodic grade check...")
 	rows, err := db.Query("SELECT id, telegram_id, cookie, donemid, grades, alarm FROM users WHERE alarm = 1")
 	if err != nil {
 		log.Println("Failed to query users:", err)
@@ -56,6 +57,7 @@ func CheckForUpdates(bot *tgbotapi.BotAPI, db *sql.DB) {
 			continue
 		}
 
+		log.Printf("Checking grades for user %d...", user.TelegramID)
 		newGrades, err := fetchGrades(user.Cookie, user.DonemID)
 		if err != nil {
 			log.Printf("Failed to fetch grades for user %d: %v\n", user.TelegramID, err)
@@ -89,6 +91,7 @@ func CheckForUpdates(bot *tgbotapi.BotAPI, db *sql.DB) {
 
 		// Send notifications after successful database update
 		if len(updates) > 0 {
+			log.Printf("Found %d updates for user %d", len(updates), user.TelegramID)
 			for _, update := range updates {
 				msg := tgbotapi.NewMessage(user.TelegramID, update)
 				if _, err := bot.Send(msg); err != nil {
@@ -97,6 +100,7 @@ func CheckForUpdates(bot *tgbotapi.BotAPI, db *sql.DB) {
 			}
 		}
 	}
+	log.Println("Finished periodic grade check")
 }
 
 func fetchGrades(cookie string, donemID string) (map[string]map[string]string, error) {

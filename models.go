@@ -22,6 +22,11 @@ func GetUserByTelegramID(db *sql.DB, telegramID int64) (*User, error) {
 }
 
 func InsertUser(db *sql.DB, user *User) error {
+	// Initialize empty grades as valid JSON
+	if user.Grades == "" {
+		user.Grades = "{}"
+	}
+
 	_, err := db.Exec("INSERT INTO users (telegram_id, cookie, donemid, alarm, grades) VALUES (?, ?, ?, ?, ?)",
 		user.TelegramID, user.Cookie, user.DonemID, user.Alarm, user.Grades)
 	return err
