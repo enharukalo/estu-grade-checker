@@ -44,7 +44,7 @@ type GradeResponse struct {
 
 func CheckForUpdates(ctx context.Context, bot *tgbotapi.BotAPI, db *sql.DB) {
 	log.Println("Starting periodic grade check...")
-	rows, err := db.QueryContext(ctx, "SELECT id, telegram_id, cookie, donemid, grades, alarm FROM users WHERE alarm = 1")
+	rows, err := db.QueryContext(ctx, "SELECT id, telegram_id, cookie, donemid, grades, alarm FROM users WHERE alarm = true")
 	if err != nil {
 		log.Println("Failed to query users:", err)
 		return
