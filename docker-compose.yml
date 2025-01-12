@@ -3,13 +3,38 @@ services:
     build: .
     container_name: estu-grade-checker
     restart: unless-stopped
-    volumes:
-      - ./data:/app/data
-      - ./.env:/app/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       - TZ=Europe/Istanbul
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=estubot
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=estu_grade_checker_bot
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "3" 
+        max-file: "3"
+
+  postgres:
+    image: postgres:15-bullseye
+    container_name: estu-grade-checker-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=estubot
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=estu_grade_checker_bot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U estubot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data: 

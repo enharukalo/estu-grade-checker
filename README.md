@@ -8,51 +8,50 @@ A Golang Telegram bot designed to monitor and notify users of grade updates from
 - Notifies users of grade updates via Telegram
 - Supports multiple users
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites
+- Docker and Docker Compose
+- A Telegram bot token from [BotFather](https://t.me/botfather)
 
-- Golang installed on your machine
-- A Telegram bot token (obtained by creating a bot with [BotFather](https://t.me/botfather))
-
-### Installation
+## Quick Start
 
 1. **Clone the repository**:
-
    ```bash
    git clone https://github.com/enharukalo/estu-grade-checker.git
+   cd estu-grade-checker
    ```
 
-2. **Install dependencies**:
-
+2. **Configure environment variables**:
    ```bash
-   go mod tidy
+   cp .env.example .env
+   # Edit .env with your Telegram bot token and database password
    ```
 
-3. **Configure environment variables**:
-
-   Create a `.env` file in the root directory and add your Telegram bot token:
-
+3. **Launch the bot**:
    ```bash
-   TELEGRAM_BOT_TOKEN=your_bot_token_here
+   docker compose up -d
    ```
 
-4. **Launch the bot**:
+## Bot Commands
 
+- `/start` - Display welcome message and instructions
+- `/cookie <cookie>` - Set your ESTU website session cookie
+- `/donemid <semester_id>` - Set your semester ID
+- `/alarm <true/false>` - Toggle grade notifications
+- `/get` - View all course grades
+- `/get <course_name>` - View specific course grades
+
+## Development
+
+To run locally for development:
+
+1. Install PostgreSQL
+2. Set up environment variables
+3. Run:
    ```bash
+   go mod download
    go run .
    ```
-
-## How to Use
-
-After setting up the bot, interact with it on Telegram to manage your grade notifications:
-
-- **`/start`**: Displays a welcome message and basic instructions.
-- **`/cookie <your_cookie>`**: Sets your ESTU website session cookie.
-- **`/donemid <your_semester_id>`**: Sets your semester ID for grade tracking.
-- **`/alarm <true/false>`**: Toggles grade update notifications on or off.
-- **`/get`**: Retrieves your current grades for all courses.
-- **`/get <course_name>`**: Fetches the grades for a specific course.
 
 ## Contributing
 

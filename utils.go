@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -41,9 +42,9 @@ type GradeResponse struct {
 	} `json:"ogrenciBirimList"`
 }
 
-func CheckForUpdates(bot *tgbotapi.BotAPI, db *sql.DB) {
+func CheckForUpdates(ctx context.Context, bot *tgbotapi.BotAPI, db *sql.DB) {
 	log.Println("Starting periodic grade check...")
-	rows, err := db.Query("SELECT id, telegram_id, cookie, donemid, grades, alarm FROM users WHERE alarm = 1")
+	rows, err := db.QueryContext(ctx, "SELECT id, telegram_id, cookie, donemid, grades, alarm FROM users WHERE alarm = 1")
 	if err != nil {
 		log.Println("Failed to query users:", err)
 		return
@@ -84,7 +85,7 @@ func CheckForUpdates(bot *tgbotapi.BotAPI, db *sql.DB) {
 			continue
 		}
 
-		if err := UpdateGrades(db, user.ID, string(updatedGrades)); err != nil {
+		if err := UpdateGrades(ctx, db, user.ID, string(updatedGrades)); err != nil {
 			log.Printf("Failed to update grades in database for user %d: %v\n", user.TelegramID, err)
 			continue
 		}

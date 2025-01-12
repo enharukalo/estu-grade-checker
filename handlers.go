@@ -1,28 +1,34 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func HandleMessage(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	if message.IsCommand() {
 		switch message.Command() {
 		case "start":
 			handleStart(bot, message)
 		case "cookie":
-			handleCookie(bot, db, message)
+			handleCookie(ctx, bot, db, message)
 		case "donemid":
-			handleDonemID(bot, db, message)
+			handleDonemID(ctx, bot, db, message)
 		case "alarm":
-			handleAlarm(bot, db, message)
+			handleAlarm(ctx, bot, db, message)
 		case "get":
-			handleGet(bot, db, message)
+			handleGet(ctx, bot, db, message)
 		}
 	}
 }
@@ -32,7 +38,7 @@ func handleStart(bot *tgbotapi.BotAPI, message *tgbotapi.Message) {
 	bot.Send(msg)
 }
 
-func handleCookie(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
+func handleCookie(ctx context.Context, bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
 	cookie := strings.TrimSpace(strings.TrimPrefix(message.Text, "/cookie"))
 	if cookie == "" {
 		msg := tgbotapi.NewMessage(message.Chat.ID, "Please provide a valid cookie.")
@@ -40,20 +46,36 @@ func handleCookie(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
 		return
 	}
 
-	user, err := GetUserByTelegramID(db, message.Chat.ID)
+	user, err := GetUserByTelegramID(ctx, db, message.Chat.ID)
 	if err != nil {
+		if err != sql.ErrNoRows {
+			log.Printf("Database error: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "An error occurred. Please try again later.")
+			bot.Send(msg)
+			return
+		}
 		user = &User{TelegramID: message.Chat.ID, Cookie: cookie}
-		InsertUser(db, user)
+		if err := InsertUser(ctx, db, user); err != nil {
+			log.Printf("Failed to insert user: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Failed to save your cookie. Please try again.")
+			bot.Send(msg)
+			return
+		}
 	} else {
 		user.Cookie = cookie
-		UpdateUser(db, user)
+		if err := UpdateUser(ctx, db, user); err != nil {
+			log.Printf("Failed to update user: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Failed to update your cookie. Please try again.")
+			bot.Send(msg)
+			return
+		}
 	}
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, "Cookie updated successfully.")
 	bot.Send(msg)
 }
 
-func handleDonemID(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
+func handleDonemID(ctx context.Context, bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
 	donemID := strings.TrimSpace(strings.TrimPrefix(message.Text, "/donemid"))
 	if donemID == "" {
 		msg := tgbotapi.NewMessage(message.Chat.ID, "Please provide a valid donemid.")
@@ -61,20 +83,36 @@ func handleDonemID(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) 
 		return
 	}
 
-	user, err := GetUserByTelegramID(db, message.Chat.ID)
+	user, err := GetUserByTelegramID(ctx, db, message.Chat.ID)
 	if err != nil {
+		if err != sql.ErrNoRows {
+			log.Printf("Database error: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "An error occurred. Please try again later.")
+			bot.Send(msg)
+			return
+		}
 		user = &User{TelegramID: message.Chat.ID, DonemID: donemID}
-		InsertUser(db, user)
+		if err := InsertUser(ctx, db, user); err != nil {
+			log.Printf("Failed to insert user: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Failed to save your donemID. Please try again.")
+			bot.Send(msg)
+			return
+		}
 	} else {
 		user.DonemID = donemID
-		UpdateUser(db, user)
+		if err := UpdateUser(ctx, db, user); err != nil {
+			log.Printf("Failed to update user: %v", err)
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Failed to update your donemID. Please try again.")
+			bot.Send(msg)
+			return
+		}
 	}
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, "DonemID updated successfully.")
 	bot.Send(msg)
 }
 
-func handleAlarm(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
+func handleAlarm(ctx context.Context, bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
 	alarm := strings.TrimSpace(strings.TrimPrefix(message.Text, "/alarm"))
 	alarmValue, err := strconv.ParseBool(alarm)
 	if err != nil {
@@ -83,22 +121,33 @@ func handleAlarm(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
 		return
 	}
 
-	user, err := GetUserByTelegramID(db, message.Chat.ID)
+	user, err := GetUserByTelegramID(ctx, db, message.Chat.ID)
 	if err != nil {
-		msg := tgbotapi.NewMessage(message.Chat.ID, "Please set your cookie and donemid first.")
+		if err == sql.ErrNoRows {
+			msg := tgbotapi.NewMessage(message.Chat.ID, "Please set your cookie and donemid first.")
+			bot.Send(msg)
+			return
+		}
+		log.Printf("Database error: %v", err)
+		msg := tgbotapi.NewMessage(message.Chat.ID, "An error occurred. Please try again later.")
 		bot.Send(msg)
 		return
 	}
 
 	user.Alarm = alarmValue
-	UpdateUser(db, user)
+	if err := UpdateUser(ctx, db, user); err != nil {
+		log.Printf("Failed to update user: %v", err)
+		msg := tgbotapi.NewMessage(message.Chat.ID, "Failed to update alarm setting. Please try again.")
+		bot.Send(msg)
+		return
+	}
 
 	msg := tgbotapi.NewMessage(message.Chat.ID, "Alarm preference updated successfully.")
 	bot.Send(msg)
 }
 
-func handleGet(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
-	user, err := GetUserByTelegramID(db, message.Chat.ID)
+func handleGet(ctx context.Context, bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
+	user, err := GetUserByTelegramID(ctx, db, message.Chat.ID)
 	if err != nil || user.Cookie == "" || user.DonemID == "" {
 		msg := tgbotapi.NewMessage(message.Chat.ID, "You need to set both cookie and donemid before using this command.")
 		bot.Send(msg)
@@ -132,7 +181,7 @@ func handleGet(bot *tgbotapi.BotAPI, db *sql.DB, message *tgbotapi.Message) {
 
 		updatedGrades, _ := json.Marshal(grades)
 		updatedGradesStr := string(updatedGrades)
-		if err := UpdateGrades(db, user.ID, updatedGradesStr); err != nil {
+		if err := UpdateGrades(ctx, db, user.ID, updatedGradesStr); err != nil {
 			msg := tgbotapi.NewMessage(message.Chat.ID, "Failed to update grades in the database.")
 			bot.Send(msg)
 			return

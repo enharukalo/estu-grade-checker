@@ -19,10 +19,9 @@ RUN CGO_ENABLED=1 GOOS=linux go build -o main .
 # Use debian slim as final image
 FROM debian:bullseye-slim
 
-# Install required dependencies
+# Install only CA certificates
 RUN apt-get update && apt-get install -y \
     ca-certificates \
-    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -30,9 +29,6 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/main .
-
-# Create volume for database
-VOLUME /app/data
 
 # Run the application
 CMD ["./main"] 
